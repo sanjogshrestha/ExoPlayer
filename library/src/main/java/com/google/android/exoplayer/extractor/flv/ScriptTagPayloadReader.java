@@ -23,6 +23,7 @@ import com.google.android.exoplayer.util.ParsableByteArray;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -32,6 +33,9 @@ import java.util.Map;
 
   private static final String NAME_METADATA = "onMetaData";
   private static final String KEY_DURATION = "duration";
+  private static final String KEY_FRAMES = "keyframes";
+  private static final String KEY_FRAME_TIMES = "times";
+  private static final String KEY_FRAME_POSITIONS = "filepositions";
 
   // AMF object types
   private static final int AMF_TYPE_NUMBER = 0;
@@ -42,6 +46,9 @@ import java.util.Map;
   private static final int AMF_TYPE_END_MARKER = 9;
   private static final int AMF_TYPE_STRICT_ARRAY = 10;
   private static final int AMF_TYPE_DATE = 11;
+  private List<Double> keyFrameTimes;
+  private List<Double> keyFrameFilePositions;
+
 
   /**
    * @param output A {@link TrackOutput} to which samples should be written.
@@ -73,18 +80,31 @@ import java.util.Map;
       return;
     }
     int type = readAmfType(data);
-    if (type != AMF_TYPE_ECMA_ARRAY) {
-      // Should never happen.
-      throw new ParserException();
-    }
-    // Set the duration to the value contained in the metadata, if present.
-    Map<String, Object> metadata = readAmfEcmaArray(data);
-    if (metadata.containsKey(KEY_DURATION)) {
-      double durationSeconds = (double) metadata.get(KEY_DURATION);
-      if (durationSeconds > 0.0) {
+//    if (type != AMF_TYPE_ECMA_ARRAY) {
+//      //   Should never happen.
+//      //aom: actually it can happen for live streams
+//      throw new ParserException();
+//
+//    }
+    if (type == AMF_TYPE_ECMA_ARRAY) {
+      // Set the duration to the value contained in the metadata, if present.
+      Map<String, Object> metadata = readAmfEcmaArray(data);
+      if (metadata.containsKey(KEY_DURATION)) {
+        double durationSeconds = (double) metadata.get(KEY_DURATION);
         setDurationUs((long) (durationSeconds * C.MICROS_PER_SECOND));
       }
+      if (metadata.containsKey(KEY_FRAMES)) {
+        HashMap<String, List<Double>> keyFrames = (HashMap<String, List<Double>>) metadata.get(KEY_FRAMES);
+        setKeyFrameTimes(keyFrames.get(KEY_FRAME_TIMES));
+        setKeyFrameFilePositions(keyFrames.get(KEY_FRAME_POSITIONS));
+      }
     }
+    else if (type == AMF_TYPE_OBJECT) {
+      Map<String, Object> metadata = readAmfObject(data);
+
+    }
+
+
   }
 
   private static int readAmfType(ParsableByteArray data) {
@@ -166,11 +186,18 @@ import java.util.Map;
    * @return The value read from the buffer.
    */
   private static HashMap<String, Object> readAmfEcmaArray(ParsableByteArray data) {
-    int count = data.readUnsignedIntToInt();
-    HashMap<String, Object> array = new HashMap<>(count);
-    for (int i = 0; i < count; i++) {
+    //ecma array is not the strict array, so it shouldn't be trusted number of item count
+    //nevertheless we need to skip this area, it can be truested toe AMF_TYPE_END_MARKER
+    //according to specification
+    data.skipBytes(4);
+
+    HashMap<String, Object> array = new HashMap<>();
+    while (true) {
       String key = readAmfString(data);
       int type = readAmfType(data);
+      if (type == AMF_TYPE_END_MARKER) {
+        break;
+      }
       array.put(key, readAmfData(data, type));
     }
     return array;
@@ -209,4 +236,19 @@ import java.util.Map;
     }
   }
 
+  public void setKeyFrameTimes(List<Double> keyFrameTimes) {
+    this.keyFrameTimes = keyFrameTimes;
+  }
+
+  public void setKeyFrameFilePositions(List<Double> keyFrameFilePositions) {
+    this.keyFrameFilePositions = keyFrameFilePositions;
+  }
+
+  public List<Double> getKeyFrameFilePositions() {
+    return keyFrameFilePositions;
+  }
+
+  public List<Double> getKeyFrameTimes() {
+    return keyFrameTimes;
+  }
 }
