@@ -75,3 +75,7 @@ and copy `library.jar` to the libs folder of your new project.
 
 To develop ExoPlayer using Android Studio, simply open the ExoPlayer project in
 the root directory of the repository.
+
+## Fix the error when use the [ExoPlayer-with-RTMP-and-FLV-seek][] to play rtmp ##
+
+[ExoPlayer-with-RTMP-and-FLV-seek]:https://github.com/ButterflyTV/ExoPlayer-with-RTMP-and-FLV-seek/tree/master/library/src/main/java/com/google/android/exoplayer/extractor
